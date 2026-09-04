@@ -13,6 +13,8 @@ const Redactor = (() => {
     credit_card: '[REDACTED_CREDIT_CARD]',
     ssn: '[REDACTED_SSN]',
     pan: '[REDACTED_PAN]',
+    bank_account: '[REDACTED_BANK_ACCOUNT]',
+    name: '[REDACTED_NAME]',
     dob: '[REDACTED_DOB]',
     pii: '[REDACTED_PII]',
   };

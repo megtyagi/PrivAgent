@@ -16,8 +16,8 @@ def test_privacy_boundary_clean_payload():
                 "id": "fullName",
                 "type": "text",
                 "label": "Full Name",
-                "value": "Rahul Sharma",
-                "redacted": False
+                "value": "[REDACTED_NAME]",
+                "redacted": True
             },
             {
                 "id": "email",
@@ -109,3 +109,27 @@ def test_sanitize_payload_redacts_raw_values():
     # The sanitized output must now pass validation
     validation_after = validate_payload(sanitized)
     assert validation_after.is_safe is True
+
+
+def test_semantic_fields_use_specific_redaction_placeholders():
+    """Semantic field metadata must select name, PAN, and bank placeholders."""
+    payload = {
+        "fields": [
+            {"id": "fullName", "label": "Full Name", "value": "Rahul Sharma"},
+            {"id": "panCard", "label": "PAN Card", "value": "ABCDE1234F"},
+            {"id": "bankAccount", "label": "Bank Account", "value": "1234567890"},
+            {"id": "institution", "label": "Institution Name", "value": "IIT Delhi"},
+            {"id": "course", "label": "Course", "value": "B.Tech Computer Science"},
+        ]
+    }
+
+    result = validate_payload(payload)
+    assert result.is_safe is False
+    sanitized = sanitize_payload(payload)
+    fields = {field["id"]: field["value"] for field in sanitized["fields"]}
+    assert fields["fullName"] == "[REDACTED_NAME]"
+    assert fields["panCard"] == "[REDACTED_PAN]"
+    assert fields["bankAccount"] == "[REDACTED_BANK_ACCOUNT]"
+    assert fields["institution"] == "IIT Delhi"
+    assert fields["course"] == "B.Tech Computer Science"
+    assert validate_payload(sanitized).is_safe is True

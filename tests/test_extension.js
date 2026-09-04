@@ -196,6 +196,40 @@ async function itAsync(desc, fn) {
     assert.strictEqual(res.type, 'password');
   });
 
+  it('classifies personal names and bank accounts without classifying legitimate fields', () => {
+    const nameField = {
+      type: 'text',
+      id: 'fullName',
+      name: 'fullName',
+      getAttribute: () => null,
+      closest: () => null
+    };
+    const bankField = {
+      type: 'text',
+      id: 'bankAccount',
+      name: 'bankAccount',
+      getAttribute: () => null,
+      closest: () => null
+    };
+    const institutionField = {
+      type: 'text',
+      id: 'institution',
+      name: 'institution',
+      getAttribute: () => null,
+      closest: () => null
+    };
+
+    const nameResult = sandbox.window.PIIDetector.isFieldSensitive(nameField);
+    const bankResult = sandbox.window.PIIDetector.isFieldSensitive(bankField);
+    const institutionResult = sandbox.window.PIIDetector.isFieldSensitive(institutionField);
+    assert.strictEqual(nameResult.sensitive, true);
+    assert.strictEqual(nameResult.type, 'name');
+    assert.strictEqual(bankResult.sensitive, true);
+    assert.strictEqual(bankResult.type, 'bank_account');
+    assert.strictEqual(institutionResult.sensitive, false);
+    assert.strictEqual(institutionResult.type, null);
+  });
+
   console.log('\n2. Redactor Module:');
   it('replaces values with semantic placeholders', () => {
     const emailRedacted = sandbox.window.Redactor.redactValue('secret@org.com', 'email');
@@ -227,6 +261,39 @@ async function itAsync(desc, fn) {
         value: 'Rahul Sharma',
         placeholder: 'Enter full name',
         getAttribute: (attr) => attr === 'aria-label' ? 'Full Name' : null,
+        closest: () => null,
+        offsetParent: {}
+      },
+      {
+        tagName: 'INPUT',
+        type: 'text',
+        id: 'panCard',
+        name: 'panCard',
+        value: 'ABCDE1234F',
+        placeholder: 'PAN Card',
+        getAttribute: () => null,
+        closest: () => null,
+        offsetParent: {}
+      },
+      {
+        tagName: 'INPUT',
+        type: 'text',
+        id: 'bankAccount',
+        name: 'bankAccount',
+        value: '1234567890',
+        placeholder: 'Bank Account Number',
+        getAttribute: () => null,
+        closest: () => null,
+        offsetParent: {}
+      },
+      {
+        tagName: 'INPUT',
+        type: 'text',
+        id: 'institution',
+        name: 'institution',
+        value: 'IIT Delhi',
+        placeholder: 'Institution Name',
+        getAttribute: () => null,
         closest: () => null,
         offsetParent: {}
       },
@@ -295,14 +362,21 @@ async function itAsync(desc, fn) {
     assert(!serialized.includes('9876543210'), 'Raw phone must not be in payload');
     assert(!serialized.includes('1234 5678 9012'), 'Raw Aadhaar must not be in payload');
     assert(!serialized.includes('SuperSecret123!'), 'Raw password must not be in payload');
+    assert(!serialized.includes('Rahul Sharma'), 'Raw name must not be in payload');
+    assert(!serialized.includes('ABCDE1234F'), 'Raw PAN must not be in payload');
+    assert(!serialized.includes('1234567890'), 'Raw bank account must not be in payload');
+    assert(serialized.includes('IIT Delhi'), 'Institution name should remain in payload');
 
     // Placeholders must be present
     assert(serialized.includes('[REDACTED_EMAIL]'), 'Email placeholder missing');
     assert(serialized.includes('[REDACTED_PHONE]'), 'Phone placeholder missing');
     assert(serialized.includes('[REDACTED_ID]'), 'Aadhaar placeholder missing');
     assert(serialized.includes('[REDACTED_PASSWORD]'), 'Password placeholder missing');
+    assert(serialized.includes('[REDACTED_NAME]'), 'Name placeholder missing');
+    assert(serialized.includes('[REDACTED_PAN]'), 'PAN placeholder missing');
+    assert(serialized.includes('[REDACTED_BANK_ACCOUNT]'), 'Bank account placeholder missing');
 
-    assert.strictEqual(payload.privacy_summary.redacted_count, 4);
+    assert.strictEqual(payload.privacy_summary.redacted_count, 7);
   });
 
   console.log('\n4. Action Executor & Security:');

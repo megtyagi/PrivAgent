@@ -66,6 +66,12 @@ def test_e2e_scholarship_page_full_flow():
         elif "pan" in f_name or PII_PATTERNS["pan_card"].search(f_val):
             is_sensitive = True
             placeholder = "[REDACTED_PAN]"
+        elif "bank" in f_name and "account" in f_name:
+            is_sensitive = True
+            placeholder = "[REDACTED_BANK_ACCOUNT]"
+        elif f_name in {"fullname", "firstname", "lastname", "givenname", "familyname", "surname"}:
+            is_sensitive = True
+            placeholder = "[REDACTED_NAME]"
 
         if is_sensitive:
             redacted_count += 1
@@ -113,6 +119,7 @@ def test_e2e_scholarship_page_full_flow():
     assert SYNTHETIC_PAGE_DATA["aadhaar"] not in serialized, "LEAK DETECTED: Raw Aadhaar found in outgoing payload!"
     assert SYNTHETIC_PAGE_DATA["password"] not in serialized, "LEAK DETECTED: Raw password found in outgoing payload!"
     assert SYNTHETIC_PAGE_DATA["panCard"] not in serialized, "LEAK DETECTED: Raw PAN found in outgoing payload!"
+    assert SYNTHETIC_PAGE_DATA["fullName"] not in serialized, "LEAK DETECTED: Raw name found in outgoing payload!"
 
     # Semantic placeholders MUST exist
     assert "[REDACTED_EMAIL]" in serialized
@@ -120,6 +127,7 @@ def test_e2e_scholarship_page_full_flow():
     assert "[REDACTED_ID]" in serialized
     assert "[REDACTED_PASSWORD]" in serialized
     assert "[REDACTED_PAN]" in serialized
+    assert "[REDACTED_NAME]" in serialized
 
     print("4. Transmitting Sanitized Payload to FastAPI Backend (/analyze)...")
     response = client.post("/analyze", json=sanitized_payload)

@@ -29,6 +29,10 @@ const PIIDetector = (() => {
     'account', 'routing',
     'secret', 'token', 'api_key', 'apikey',
   ];
+  const PERSONAL_NAME_MARKERS = [
+    'fullname', 'firstname', 'lastname', 'givenname', 'familyname',
+    'surname', 'applicantname', 'studentname',
+  ];
 
   /**
    * Check if a form field is sensitive based on its attributes.
@@ -45,6 +49,21 @@ const PIIDetector = (() => {
       element.getAttribute('aria-label'),
       element.getAttribute('autocomplete'),
     ].filter(Boolean).map(s => s.toLowerCase());
+
+    // Match explicit personal-name fields without classifying fields such as
+    // institutionName or courseName as PII.
+    for (const attr of attrs) {
+      const normalized = attr.replace(/[\s_-]/g, '');
+      if (PERSONAL_NAME_MARKERS.some(marker => normalized.includes(marker))) {
+        return { sensitive: true, type: 'name' };
+      }
+      if (normalized.includes('pan')) {
+        return { sensitive: true, type: 'pan' };
+      }
+      if (normalized.includes('bankaccount') || normalized.includes('routing')) {
+        return { sensitive: true, type: 'bank_account' };
+      }
+    }
 
     // Check input type
     if (element.type === 'email') return { sensitive: true, type: 'email' };
@@ -149,6 +168,7 @@ const PIIDetector = (() => {
     if (['ssn', 'social'].includes(keyword)) return 'ssn';
     if (['credit', 'card', 'cc', 'cvv', 'cvc'].includes(keyword)) return 'credit_card';
     if (['pan', 'passport'].includes(keyword)) return 'pan';
+    if (['account', 'routing'].includes(keyword)) return 'bank_account';
     if (['dob', 'birth'].includes(keyword)) return 'dob';
     return 'pii';
   }

@@ -96,8 +96,8 @@ async def analyze(request: AnalyzeRequest):
             privacy_verified=validation.is_safe,
         )
     except Exception as e:
-        logger.error("[%s] Analysis error: %s", request_id, str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("[%s] Analysis error: %s", request_id, type(e).__name__)
+        raise HTTPException(status_code=500, detail="Analysis failed safely")
 
 
 @router.post("/command", response_model=CommandResponse)
@@ -128,5 +128,5 @@ async def command(request: CommandRequest):
             request_id=request_id,
         )
     except Exception as e:
-        logger.error("[%s] Command error: %s", request_id, str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("[%s] Command error: %s", request_id, type(e).__name__)
+        raise HTTPException(status_code=500, detail="Command failed safely")

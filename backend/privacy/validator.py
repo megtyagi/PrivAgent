@@ -46,9 +46,31 @@ SAFE_PLACEHOLDERS = {
     "[REDACTED_CREDIT_CARD]",
     "[REDACTED_SSN]",
     "[REDACTED_PAN]",
+    "[REDACTED_NAME]",
+    "[REDACTED_BANK_ACCOUNT]",
     "[REDACTED_PII]",
     "[FACE_REDACTED]",
+    "[REDACTED_SECRET]",
 }
+
+
+def _semantic_field_type(field: dict) -> str | None:
+    """Classify only explicit sensitive field identifiers and labels."""
+    metadata = " ".join(
+        str(field.get(key, "")).lower()
+        for key in ("id", "name", "label", "placeholder", "aria_label")
+    )
+    normalized = re.sub(r"[\s_-]+", "", metadata)
+    if any(marker in normalized for marker in (
+        "fullname", "firstname", "lastname", "givenname", "familyname",
+        "surname", "applicantname", "studentname",
+    )):
+        return "name"
+    if "pan" in normalized:
+        return "pan"
+    if "bankaccount" in normalized or "routing" in normalized:
+        return "bank_account"
+    return None
 
 
 @dataclass
@@ -113,6 +135,15 @@ def scan_string(value: str, field_path: str = "") -> list[PrivacyViolation]:
 def scan_dict(data: dict, path: str = "root") -> list[PrivacyViolation]:
     """Recursively scan a dictionary for PII."""
     violations = []
+    semantic_type = _semantic_field_type(data)
+    if semantic_type and isinstance(data.get("value"), str):
+        value = data["value"]
+        if not _is_safe_placeholder(value):
+            violations.append(PrivacyViolation(
+                field_path=f"{path}.value",
+                pii_type=semantic_type,
+                matched_value=_mask_for_log(value),
+            ))
     for key, value in data.items():
         current_path = f"{path}.{key}"
         if isinstance(value, str):
@@ -151,7 +182,27 @@ def sanitize_payload(data: dict) -> dict:
     """Best-effort server-side sanitization of a payload.
     Replaces detected PII with placeholders."""
     import json
-    text = json.dumps(data)
+    sanitized_data = json.loads(json.dumps(data))
+
+    def sanitize_semantic_fields(value):
+        if isinstance(value, dict):
+            semantic_type = _semantic_field_type(value)
+            if semantic_type and isinstance(value.get("value"), str):
+                placeholder = {
+                    "name": "[REDACTED_NAME]",
+                    "pan": "[REDACTED_PAN]",
+                    "bank_account": "[REDACTED_BANK_ACCOUNT]",
+                }[semantic_type]
+                if not _is_safe_placeholder(value["value"]):
+                    value["value"] = placeholder
+            for child in value.values():
+                sanitize_semantic_fields(child)
+        elif isinstance(value, list):
+            for child in value:
+                sanitize_semantic_fields(child)
+
+    sanitize_semantic_fields(sanitized_data)
+    text = json.dumps(sanitized_data)
 
     replacements = {
         "email": "[REDACTED_EMAIL]",
@@ -160,6 +211,8 @@ def sanitize_payload(data: dict) -> dict:
         "credit_card": "[REDACTED_CREDIT_CARD]",
         "ssn": "[REDACTED_SSN]",
         "pan_card": "[REDACTED_PAN]",
+        "name": "[REDACTED_NAME]",
+        "bank_account": "[REDACTED_BANK_ACCOUNT]",
     }
 
     for pii_type, pattern in PII_PATTERNS.items():
